@@ -2,6 +2,8 @@
 
 Bug reports and pull requests are welcome.
 
+Everyone taking part is expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Reporting a bug
 
 Open an [issue](https://github.com/Edison-A-N/dsh-hippocampus/issues) with:
