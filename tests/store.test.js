@@ -49,36 +49,36 @@ test('search finds Chinese two-char words via bigrams', () => {
 
 test('search tolerates FTS5 operators and quotes in the query', () => {
   const { store } = makeStore()
-  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: '测试要求 node --test 运行' })
+  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'tests run with node --test' })
   // hyphens are FTS5 NOT operators when unquoted; tokenize keeps them inside
   // latin tokens, so the expression must quote every token
   const hits = store.search({ projectId: 'p1', query: 'node --test' })
   assert.equal(hits.length, 1)
-  const quoted = store.search({ projectId: 'p1', query: '"node" 测试' })
+  const quoted = store.search({ projectId: 'p1', query: '"node" tests' })
   assert.equal(quoted.length, 1)
 })
 
 test('update moves category and retokenizes FTS', () => {
   const { store } = makeStore()
-  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: '服务常驻 3080 端口' })
+  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'the service listens on port 3080' })
   const updated = store.update(row.id, { category: 'CONFIG_VALUES' })
   assert.equal(updated.category, 'CONFIG_VALUES')
-  const hits = store.search({ projectId: 'p1', query: '端口' })
+  const hits = store.search({ projectId: 'p1', query: 'port' })
   assert.equal(hits.length, 1)
 })
 
 test('update throws DUPLICATE when clashing with another active row', () => {
   const { store } = makeStore()
-  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: '内容甲' })
-  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: '内容乙' })
-  assert.throws(() => store.update(row.id, { content: '内容甲' }), /DUPLICATE|already exists/)
+  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'content A' })
+  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'content B' })
+  assert.throws(() => store.update(row.id, { content: 'content A' }), /DUPLICATE|already exists/)
 })
 
 test('archive removes from search and list', () => {
   const { store } = makeStore()
-  const row = store.write({ projectId: 'p1', category: 'NAMING', content: '命名约定甲' })
+  const row = store.write({ projectId: 'p1', category: 'NAMING', content: 'naming convention A' })
   store.archive(row.id)
-  assert.equal(store.search({ projectId: 'p1', query: '命名' }).length, 0)
+  assert.equal(store.search({ projectId: 'p1', query: 'naming' }).length, 0)
   assert.equal(store.list({ projectId: 'p1' }).length, 0)
   assert.equal(store.list({ projectId: 'p1', status: 'archived' }).length, 1)
 })

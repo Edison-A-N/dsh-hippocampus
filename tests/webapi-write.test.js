@@ -68,13 +68,13 @@ const harness = ({ store, dreamer, sessionQuery, rejection } = {}) => {
 
 test('PATCH memories: happy path updates content and importance', async () => {
   const store = makeStore()
-  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: '原始内容' })
+  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'original content' })
   const { call } = harness({ store })
   const { status, payload } = await call('POST', '/plugins/hippocampus/api/memories/edit', {
-    body: { id: row.id, content: '改后的内容', importance: 90 },
+    body: { id: row.id, content: 'edited content', importance: 90 },
   })
   assert.equal(status, 200)
-  assert.equal(payload.memory.content, '改后的内容')
+  assert.equal(payload.memory.content, 'edited content')
   assert.equal(payload.memory.importance, 90)
   assert.equal(store.get(row.id).importance, 90)
 })

@@ -58,6 +58,7 @@ npm test        # node:test, no network, no host required (host-contract tests s
 
 - Host side: ESM (`"type": "module"`), plain JSDoc comments, no build step, no TypeScript. The Web panel under `client/src` is TypeScript/React built with esbuild; rebuild `lib/client.js` (`npm run build:client`) in the same commit as any change there.
 - Text the plugin injects into sessions or returns from tools is English; it must not set the session's language.
+- The repo is English-first: code, comments, docs, prompts and test fixtures are English. Chinese appears only in `README.zh.md`, the Chinese UI dictionary in `client/src/locales.ts`, and inputs that exist to exercise CJK handling (tokenizer, search, open-item markers and the tests for them).
 - Node >= 22.19 (`node:sqlite` requirement).
 - Comment style: explain *why* (constraints, cache semantics, failure modes), not *what*.
 - Env-var knobs follow `HIPPOCAMPUS_<SUBSYSTEM>_<FIELD>`; optional features degrade silently when their env is unset (see the config table in README.md).

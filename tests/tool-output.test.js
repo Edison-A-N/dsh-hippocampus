@@ -25,7 +25,7 @@ test('get/list/update/archive results are lossless JSON: no embedding or embedde
   const { tool, run } = harnessTool(store)
   assert.equal(tool.name, 'ctx_memory')
 
-  const written = run({ action: 'write', category: 'PROJECT_RULES', content: '记忆内容甲', importance: 70 })
+  const written = run({ action: 'write', category: 'PROJECT_RULES', content: 'memory content A', importance: 70 })
   assert.equal(written.result, 'written')
   // store a vector so the raw row definitely carries a BLOB
   store.saveEmbedding(written.memory.id, Float64Array.from([1, 0]))
@@ -47,7 +47,7 @@ test('get/list/update/archive results are lossless JSON: no embedding or embedde
 test('projected memory carries the documented fields only', () => {
   const store = makeStore()
   const { run } = harnessTool(store)
-  const written = run({ action: 'write', category: 'ARCHITECTURE', content: '记忆内容乙' })
+  const written = run({ action: 'write', category: 'ARCHITECTURE', content: 'memory content B' })
   const got = run({ action: 'get', id: written.memory.id })
   assert.deepEqual(
     Object.keys(got.memory).sort(),

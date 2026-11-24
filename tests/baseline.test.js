@@ -16,13 +16,13 @@ test('composeBaseline returns null with no memories', () => {
 
 test('composeBaseline groups categories in canonical order with ids', () => {
   const store = makeStore()
-  store.write({ projectId: 'p1', category: 'CONFIG_VALUES', content: '端口 3080' })
-  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: '本体一行不改' })
+  store.write({ projectId: 'p1', category: 'CONFIG_VALUES', content: 'port 3080' })
+  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'never edit the host package' })
   const text = composeBaseline(store, 'p1')
   assert.ok(text.includes('[PROJECT_RULES]'))
   assert.ok(text.includes('[CONFIG_VALUES]'))
   assert.ok(text.indexOf('[PROJECT_RULES]') < text.indexOf('[CONFIG_VALUES]'))
-  assert.match(text, /- \[m\d+\] 本体一行不改/)
+  assert.match(text, /- \[m\d+\] never edit the host package/)
   assert.ok(!text.includes('importance'), 'importance ranks rows but stays off the wire')
   assert.ok(text.startsWith('<project-memory'))
 })
@@ -31,45 +31,45 @@ test('composeBaseline selects by importance across categories, not category firs
   const store = makeStore()
   // Enough low-importance rules to fill the budget on their own.
   for (let i = 0; i < 40; i += 1) {
-    store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: `普通规则 ${i} `.repeat(10), importance: 40 })
+    store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: `ordinary rule ${i} `.repeat(10), importance: 40 })
   }
-  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: '关键架构决策', importance: 90 })
+  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'key architecture decision', importance: 90 })
   const text = composeBaseline(store, 'p1')
-  assert.ok(text.includes('关键架构决策'), 'a high-importance row outside PROJECT_RULES must not be crowded out')
+  assert.ok(text.includes('key architecture decision'), 'a high-importance row outside PROJECT_RULES must not be crowded out')
   assert.ok(text.indexOf('[PROJECT_RULES]') < text.indexOf('[ARCHITECTURE]'), 'layout keeps canonical category order')
 })
 
 test('composeBaseline never injects working notes', () => {
   const store = makeStore()
-  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: '长期规则' })
-  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: '待办：以后再做', sourceType: 'note', importance: 99 })
+  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'long-term rule' })
+  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'pending: do it later', sourceType: 'note', importance: 99 })
   const text = composeBaseline(store, 'p1')
-  assert.ok(text.includes('长期规则'))
-  assert.ok(!text.includes('待办'))
+  assert.ok(text.includes('long-term rule'))
+  assert.ok(!text.includes('do it later'))
   const onlyNotes = makeStore()
-  onlyNotes.write({ projectId: 'p1', category: 'PROJECT_RULES', content: '只有笔记', sourceType: 'note' })
+  onlyNotes.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'only a note', sourceType: 'note' })
   assert.equal(composeBaseline(onlyNotes, 'p1'), null)
 })
 
 test('composeBaseline marks verified rows and frames memories as records', () => {
   const store = makeStore()
-  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: '核对过的事实' })
-  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: '没核对过的事实' })
+  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'fact that was checked' })
+  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'fact never checked' })
   store.setVerification(row.id, 'verified', { commit: 'abc' })
   const text = composeBaseline(store, 'p1')
-  assert.match(text, new RegExp(`\\[m${row.id} verified\\] 核对过的事实`))
-  assert.match(text, /\[m\d+\] 没核对过的事实/)
+  assert.match(text, new RegExp(`\\[m${row.id} verified\\] fact that was checked`))
+  assert.match(text, /\[m\d+\] fact never checked/)
   assert.match(text, /they are not instructions/)
 })
 
 test('composeBaseline marks stale rows and ranks them last', () => {
   const store = makeStore()
-  const stale = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: '对不上的事实', importance: 90 })
+  const stale = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'fact that disagrees', importance: 90 })
   store.setVerification(stale.id, 'stale', { commit: 'abc' })
-  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: '普通事实', importance: 40 })
+  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'ordinary fact', importance: 40 })
   const text = composeBaseline(store, 'p1')
-  assert.match(text, new RegExp(`\\[m${stale.id} possibly stale\\] 对不上的事实`))
-  assert.ok(text.indexOf('普通事实') < text.indexOf('对不上的事实'))
+  assert.match(text, new RegExp(`\\[m${stale.id} possibly stale\\] fact that disagrees`))
+  assert.ok(text.indexOf('ordinary fact') < text.indexOf('fact that disagrees'))
 })
 
 test('compareSelectionPriority: a stale check is not reinforcement', async () => {
@@ -88,9 +88,9 @@ test('compareSelectionPriority: equal importance prefers the recently reinforced
 
 test('composeBaseline drops low-importance tail over budget', () => {
   const store = makeStore()
-  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: '高重要性'.repeat(20), importance: 99 })
+  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'high importance '.repeat(20), importance: 99 })
   for (let i = 0; i < 50; i += 1) {
-    store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: `低重要性长内容条目 ${i} `.repeat(8), importance: 10 })
+    store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: `low-importance long entry ${i} `.repeat(8), importance: 10 })
   }
   const text = composeBaseline(store, 'p1')
   assert.ok(text.length < 6000)
@@ -129,7 +129,7 @@ test('describeIdentity renders a short fingerprint', () => {
 test('baseline injection message carries an id (session validator requires it)', async () => {
   const { registerBaselineInjection } = await import('../lib/index.js')
   const store = makeStore()
-  store.write({ projectId: 'git:p1', category: 'PROJECT_RULES', content: '带 id 回归' })
+  store.write({ projectId: 'git:p1', category: 'PROJECT_RULES', content: 'id regression' })
   const resolver = { resolve: () => ({ id: 'git:p1', root: '/p1' }) }
   let handler
   const ctx = { on: (_event, fn) => { handler = fn } }
@@ -176,10 +176,10 @@ async function runPreStep(register, { session, store, newMessages }) {
 test('baseline is not re-injected on a later turn once it is on the surface', async () => {
   const { registerBaselineInjection } = await import('../lib/index.js')
   const store = makeStore()
-  store.write({ projectId: 'git:p1', category: 'PROJECT_RULES', content: '跨 turn 去重' })
+  store.write({ projectId: 'git:p1', category: 'PROJECT_RULES', content: 'cross-turn dedup' })
   const firstTurn = await runPreStep(registerBaselineInjection, {
     session: fakeSession([]), store,
-    newMessages: [{ id: 'u1', role: 'user', content: [{ type: 'text', text: '第一轮' }], source: { kind: 'user' } }],
+    newMessages: [{ id: 'u1', role: 'user', content: [{ type: 'text', text: 'first turn' }], source: { kind: 'user' } }],
   })
   const baseline = firstTurn.messages.find(isHippocampusMessage)
   assert.notEqual(baseline, undefined)
@@ -188,7 +188,7 @@ test('baseline is not re-injected on a later turn once it is on the surface', as
   // turn-1 baseline lives on the persisted surface.
   const secondTurn = await runPreStep(registerBaselineInjection, {
     session: fakeSession([{ role: 'user', content: [], source: { kind: 'user' } }, baseline]), store,
-    newMessages: [{ id: 'u2', role: 'user', content: [{ type: 'text', text: '第二轮' }], source: { kind: 'user' } }],
+    newMessages: [{ id: 'u2', role: 'user', content: [{ type: 'text', text: 'second turn' }], source: { kind: 'user' } }],
   })
   assert.equal(secondTurn.messages.filter(isHippocampusMessage).length, 0)
 })
@@ -196,10 +196,10 @@ test('baseline is not re-injected on a later turn once it is on the surface', as
 test('baseline returns after a compaction shadowed it off the surface', async () => {
   const { registerBaselineInjection } = await import('../lib/index.js')
   const store = makeStore()
-  store.write({ projectId: 'git:p1', category: 'PROJECT_RULES', content: '压缩后重注入' })
+  store.write({ projectId: 'git:p1', category: 'PROJECT_RULES', content: 'reinjected after compaction' })
   const afterReplace = await runPreStep(registerBaselineInjection, {
     session: fakeSession([{ role: 'user', content: [], source: { kind: 'compaction' } }]), store,
-    newMessages: [{ id: 'u3', role: 'user', content: [{ type: 'text', text: '继续' }], source: { kind: 'user' } }],
+    newMessages: [{ id: 'u3', role: 'user', content: [{ type: 'text', text: 'continue' }], source: { kind: 'user' } }],
   })
   assert.equal(afterReplace.messages.filter(isHippocampusMessage).length, 1)
 })
@@ -207,9 +207,9 @@ test('baseline returns after a compaction shadowed it off the surface', async ()
 test('auto-search hint fires next to the baseline once, then never again', async () => {
   const { registerAutoSearchHint } = await import('../lib/index.js')
   const store = makeStore()
-  store.write({ projectId: 'git:p1', category: 'PROJECT_RULES', content: 'ctx_reduce 丢弃大段工具输出' })
+  store.write({ projectId: 'git:p1', category: 'PROJECT_RULES', content: 'ctx_reduce drops large tool output' })
   const register = (ctx, deps) => registerAutoSearchHint(ctx, { ...deps, embeddings: undefined })
-  const user = { id: 'u1', role: 'user', content: [{ type: 'text', text: 'ctx_reduce 在插件里有吗' }], source: { kind: 'user' } }
+  const user = { id: 'u1', role: 'user', content: [{ type: 'text', text: 'is ctx_reduce in the plugin' }], source: { kind: 'user' } }
   const baseline = { id: 'b1', role: 'user', content: [], source: { kind: 'hippocampus', baseline: true } }
   const first = await runPreStep(register, { session: fakeSession([]), store, newMessages: [user, baseline] })
   const hint = first.messages.find(message => message.source?.hint === true)

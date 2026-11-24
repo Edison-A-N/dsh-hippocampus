@@ -120,7 +120,7 @@ test('renderCompartment: heading carries the seq range, tier falls back to a ric
 test('formatNode: user verbatim, TC/TR compact, reasoning and system dropped', () => {
   const names = new Map()
   assert.equal(formatNode(1, { role: 'system', content: [{ type: 'text', text: 'sys' }] }), '')
-  assert.equal(formatNode(2, { role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: '修一下' }] }), '[2] U: 修一下')
+  assert.equal(formatNode(2, { role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'fix this' }] }), '[2] U: fix this')
   const assistant = formatNode(3, {
     role: 'assistant',
     content: [

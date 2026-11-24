@@ -196,7 +196,7 @@ test('curate refuses a shrinking rewrite without a survivor and gates demotion t
   }))
   store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: long })
   store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'backlog: do x later' })
-  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: '2026-01-05 起：发布前先跑完整测试', importance: 80 })
+  store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'Since 2026-01-05: run the full test suite before a release', importance: 80 })
   store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'rule four' })
   store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'rule five' })
   store.write({ projectId: 'p1', category: 'PROJECT_RULES', content: 'Design rule (since 2026-01-05): keep the public API stable', importance: 75 })

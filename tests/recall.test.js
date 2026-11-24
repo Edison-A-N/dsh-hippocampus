@@ -62,17 +62,17 @@ const HITS = [
 
 test('ctx_search without sessionQuery degrades to memories-only (no sessions key crash)', async () => {
   const store = makeStore()
-  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'parser 是递归下降实现' })
+  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'the parser is a recursive-descent implementation' })
   const h = harness(store, undefined)
   const result = await h.run('ctx_search', { query: 'parser' })
   assert.equal(result.count, 1)
-  assert.equal(result.memories[0].content, 'parser 是递归下降实现')
+  assert.equal(result.memories[0].content, 'the parser is a recursive-descent implementation')
   assert.equal(result.sessions.length, 0)
 })
 
 test('late-activating sessionQuery: first search degrades, later search finds sessions', async () => {
   const store = makeStore()
-  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'parser 是递归下降实现' })
+  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'the parser is a recursive-descent implementation' })
   // The getter returns undefined at first (service still loading), then the
   // service — exactly the late-activation timeline in a real composition.
   let service = undefined
@@ -98,9 +98,9 @@ test('late-activating sessionQuery: first search degrades, later search finds se
 
 test('ctx_search fuses memories and session history, scoped by cwd', async () => {
   const store = makeStore()
-  store.write({ projectId: 'p1', category: 'CONFIG_VALUES', content: '端口 3080' })
+  store.write({ projectId: 'p1', category: 'CONFIG_VALUES', content: 'port 3080' })
   const h = harness(store, fakeSessionQuery(HITS))
-  const result = await h.run('ctx_search', { query: 'parser 端口' })
+  const result = await h.run('ctx_search', { query: 'parser port' })
   // one memory hit + two session hits (both under /r), the /elsewhere session invisible
   assert.equal(result.memories.length, 1)
   assert.equal(result.sessions.length, 2)
@@ -117,7 +117,7 @@ test('ctx_search scope=memories skips the session lane entirely', async () => {
 
 test('ctx_search scope=sessions skips the memory lanes entirely', async () => {
   const store = makeStore()
-  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'parser 是递归下降实现' })
+  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'the parser is a recursive-descent implementation' })
   const h = harness(store, fakeSessionQuery(HITS))
   const result = await h.run('ctx_search', { query: 'parser', scope: 'sessions' })
   assert.equal(result.memories.length, 0)
@@ -149,7 +149,7 @@ test('ctx_expand returns an error record (not a throw) on failure', async () => 
 test('ctx_note stores a note as a searchable memory with source_type note', async () => {
   const store = makeStore()
   const h = harness(store, undefined)
-  const written = h.run('ctx_note', { content: '部署脚本入口是 scripts/deploy.sh', importance: 60 })
+  const written = h.run('ctx_note', { content: 'the deploy script entry point is scripts/deploy.sh', importance: 60 })
   assert.equal(written.result, 'written')
   const row = store.get(written.memory.id)
   assert.equal(row.source_type, 'note')
@@ -157,7 +157,7 @@ test('ctx_note stores a note as a searchable memory with source_type note', asyn
   const found = await h.run('ctx_search', { query: 'deploy' })
   assert.equal(found.memories.length, 1)
   // dedup: same note again is a duplicate
-  const dup = h.run('ctx_note', { content: '部署脚本入口是 scripts/deploy.sh' })
+  const dup = h.run('ctx_note', { content: 'the deploy script entry point is scripts/deploy.sh' })
   assert.equal(dup.result, 'duplicate')
 })
 
@@ -169,7 +169,7 @@ test('ctx_note empty content throws', () => {
 
 test('ctx_search says when the session-history lane is off', async () => {
   const store = makeStore()
-  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'parser 是递归下降实现' })
+  store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'the parser is a recursive-descent implementation' })
   const disabled = Object.assign(new Error('session search is disabled'), { code: 'SESSION_QUERY_SEARCH_DISABLED' })
   const off = harness(store, { searchSessions: async () => { throw disabled } })
   assert.equal((await off.run('ctx_search', { query: 'parser' })).sessionSearch, 'disabled')

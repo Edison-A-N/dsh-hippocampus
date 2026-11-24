@@ -2,16 +2,16 @@
  * Hippocampus compaction panel as a conversation view tab: what this plugin
  * does to the context, which the host's own token views cannot show.
  *
- * - 概览: KPI tiles (model calls and input-weighted cache hit rate over the
+ * - Overview: KPI tiles (model calls and input-weighted cache hit rate over the
  *   rows the chart draws; whole-session busts and prefix rewrites, the latter
  *   counted from the log's compaction/summary events and tool-output prune
  *   batches; project curation runs).
- * - 缓存命中: one stacked bar per model call (cache read / write / uncached,
+ * - Cache hits: one stacked bar per model call (cache read / write / uncached,
  *   height = input size), red dot = bust (a compaction replaced the prefix
  *   before that call).
- * - 压缩记录: per-call summarization records (mode, model, shadowed span,
+ * - Compactions: per-call summarization records (mode, model, shadowed span,
  *   usage, duration, summary text) plus the raw compaction event timeline.
- * - 后台整理: dreamer run records with the manual trigger.
+ * - Background curation: dreamer run records with the manual trigger.
  *
  * Context occupancy and composition live in the host token views (and
  * dsh-context), so this panel does not repeat them.

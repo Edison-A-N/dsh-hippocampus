@@ -17,7 +17,7 @@ Accepted
 
 Dual-lane retrieval with reciprocal rank fusion (RRF, k=60):
 
-- **Full-text lane**: FTS5 with a pre-tokenized column. The tokenizer emits overlapping 2-gram bigrams for runs of Han, Hiragana, Katakana and Hangul (so 压缩 matches 把会话历史压缩) and keeps words of other scripts whole (letters, digits and marks of any script, plus `_.:/-`) (so `dsh-compaction` matches as one token). Query tokens are individually quoted so FTS5 operators (`-` = NOT, quotes) can't inject. Recall-oriented: tokens OR'ed.
+- **Full-text lane**: FTS5 with a pre-tokenized column. The tokenizer emits overlapping 2-gram bigrams for runs of Han, Hiragana, Katakana and Hangul (so a two-character Chinese word matches a sentence that contains it) and keeps words of other scripts whole (letters, digits and marks of any script, plus `_.:/-`) (so `dsh-compaction` matches as one token). Query tokens are individually quoted so FTS5 operators (`-` = NOT, quotes) can't inject. Recall-oriented: tokens OR'ed.
 - **Semantic lane** (optional, see ADR-6): query embedded once, cosine similarity against stored vectors, top-k.
 - **Fusion**: RRF over the two ranked id lists — no score calibration needed across lanes with incomparable units.
 

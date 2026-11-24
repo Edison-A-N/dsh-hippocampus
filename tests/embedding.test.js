@@ -28,8 +28,8 @@ test('cosine similarity: identical 1, orthogonal 0, scaled invariant', () => {
 
 test('store embedding lifecycle: save, pending, semantic search', () => {
   const store = makeStore()
-  const row1 = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: '压缩历史为分层摘要' })
-  const row2 = store.write({ projectId: 'p1', category: 'CONFIG_VALUES', content: '服务端口 3080' })
+  const row1 = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'compress history into tiered summaries' })
+  const row2 = store.write({ projectId: 'p1', category: 'CONFIG_VALUES', content: 'the service port is 3080' })
   assert.equal(store.pendingEmbeddings('p1').length, 2)
   // orthogonal-ish vectors: row1 along axis 0, row2 along axis 1
   store.saveEmbedding(row1.id, Float64Array.from([1, 0]))
@@ -44,15 +44,15 @@ test('store embedding lifecycle: save, pending, semantic search', () => {
 
 test('update clears stale embedding', () => {
   const store = makeStore()
-  const row = store.write({ projectId: 'p1', category: 'NAMING', content: '命名甲' })
+  const row = store.write({ projectId: 'p1', category: 'NAMING', content: 'naming A' })
   store.saveEmbedding(row.id, Float64Array.from([1, 0]))
-  store.update(row.id, { content: '命名乙' })
+  store.update(row.id, { content: 'naming B' })
   assert.equal(store.pendingEmbeddings('p1').length, 1)
 })
 
 test('archive mid-flight: saveEmbedding is a no-op for archived rows', () => {
   const store = makeStore()
-  const row = store.write({ projectId: 'p1', category: 'NAMING', content: '命名丙' })
+  const row = store.write({ projectId: 'p1', category: 'NAMING', content: 'naming C' })
   store.archive(row.id)
   store.saveEmbedding(row.id, Float64Array.from([1, 0]))
   assert.equal(store.pendingEmbeddings('p1').length, 0)
