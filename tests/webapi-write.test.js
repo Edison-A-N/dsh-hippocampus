@@ -10,22 +10,26 @@ import { Dreamer } from '../lib/dreamer.js'
 const makeStore = () => new MemoryStore(join(mkdtempSync(join(tmpdir(), 'hippo-webapi-')), 'm.db'))
 
 /** Fake req/res pair plus a harness that captures registered routes. */
-const harness = ({ store, dreamer, sessionQuery, rejection } = {}) => {
+const OWNER = { principal: { kind: 'owner' } }
+
+/** `peer: null` models a 0.2.2 webServer, which passes no Peer. */
+const harness = ({ store, dreamer, sessionQuery, connection, peer = OWNER } = {}) => {
   const routes = new Map()
+  const auths = new Map()
   const ctx = {
     webServer: {
-      register: ({ kind, path, handler }) => {
+      register: ({ kind, path, auth, handler }) => {
         assert.equal(kind, 'exact')
         routes.set(path, handler)
+        auths.set(path, auth)
         return () => routes.delete(path)
       },
     },
-    connection: {
-      // Host/Origin fence: accept unless the test sets a rejection code
-      requestRejection: () => rejection,
-      // every request in tests is pre-authenticated
-      authorizeIndex: () => true,
-    },
+    // DSH 0.2.3 shape by default: the webServer admitted the request and
+    // passes an owner Peer; the connection has neither requestRejection nor
+    // authorizeIndex. Pass `peer: null` plus `connection` to model the
+    // 0.2.2 in-handler fences.
+    connection: connection ?? {},
   }
   registerWebApi(ctx, {
     store,
@@ -60,10 +64,10 @@ const harness = ({ store, dreamer, sessionQuery, rejection } = {}) => {
         }
       },
     }
-    await handler(req, res)
+    await handler(req, res, peer ?? undefined)
     return { status, payload }
   }
-  return { call, routes }
+  return { call, routes, auths }
 }
 
 test('PATCH memories: happy path updates content and importance', async () => {
@@ -239,13 +243,74 @@ test('write routes refuse a body that is not declared as JSON', async () => {
   assert.equal(ok.status, 200)
 })
 
-test('a request the Host/Origin fence rejects never reaches the handler', async () => {
+test('every API route requires a logged-in peer (DSH 0.2.3 webServer admission)', () => {
+  const { auths } = harness({ store: makeStore() })
+  assert.ok(auths.size > 0)
+  for (const [path, auth] of auths) assert.equal(auth, 'required', path)
+})
+
+test('DSH 0.2.3: a request the webServer admitted as the owner reaches the handler', async () => {
+  const { call } = harness({ store: makeStore() })
+  assert.equal((await call('GET', '/plugins/hippocampus/api/projects')).status, 200)
+})
+
+test('DSH 0.2.3: an admitted Peer that is not the owner gets 403, like the host\'s exact routes', async () => {
   const store = makeStore()
   const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'x' })
-  const { call } = harness({ store, rejection: 403 })
+  const { call } = harness({ store, peer: { principal: { kind: 'viewer' } } })
   assert.equal((await call('POST', '/plugins/hippocampus/api/memories/archive', { body: { id: row.id } })).status, 403)
   assert.equal((await call('GET', '/plugins/hippocampus/api/projects')).status, 403)
   assert.equal(store.get(row.id).status, 'active')
+})
+
+test('fails closed: no admitted Peer and no 0.2.2 fences answers 503', async () => {
+  const store = makeStore()
+  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'x' })
+  for (const connection of [{}, { authorizeIndex: () => true }, { requestRejection: () => undefined }]) {
+    const { call } = harness({ store, connection, peer: null })
+    assert.equal((await call('GET', '/plugins/hippocampus/api/projects')).status, 503)
+    assert.equal((await call('POST', '/plugins/hippocampus/api/memories/archive', { body: { id: row.id } })).status, 503)
+  }
+  assert.equal(store.get(row.id).status, 'active')
+})
+
+test('DSH 0.2.2: a request the Host/Origin fence rejects never reaches the handler', async () => {
+  const store = makeStore()
+  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'x' })
+  let cookieChecked = false
+  const connection = {
+    requestRejection: () => 403,
+    authorizeIndex: () => { cookieChecked = true; return true },
+  }
+  const { call } = harness({ store, connection, peer: null })
+  assert.equal((await call('POST', '/plugins/hippocampus/api/memories/archive', { body: { id: row.id } })).status, 403)
+  assert.equal((await call('GET', '/plugins/hippocampus/api/projects')).status, 403)
+  assert.equal(store.get(row.id).status, 'active')
+  assert.equal(cookieChecked, false)
+})
+
+test('DSH 0.2.2: a request without the login cookie gets the 401 authorizeIndex writes', async () => {
+  const store = makeStore()
+  const row = store.write({ projectId: 'p1', category: 'ARCHITECTURE', content: 'x' })
+  const connection = {
+    requestRejection: () => undefined,
+    authorizeIndex: (_req, res) => { res.writeHead(401); res.end(''); return false },
+  }
+  const { call } = harness({ store, connection, peer: null })
+  assert.equal((await call('POST', '/plugins/hippocampus/api/memories/archive', { body: { id: row.id } })).status, 401)
+  assert.equal(store.get(row.id).status, 'active')
+})
+
+test('DSH 0.2.2: an authorized request passes both fences', async () => {
+  const store = makeStore()
+  const seen = []
+  const connection = {
+    requestRejection: req => { seen.push(['trust', req.method]); return undefined },
+    authorizeIndex: req => { seen.push(['cookie', req.method]); return true },
+  }
+  const { call } = harness({ store, connection, peer: null })
+  assert.equal((await call('GET', '/plugins/hippocampus/api/projects')).status, 200)
+  assert.deepEqual(seen, [['trust', 'GET'], ['cookie', 'GET']])
 })
 
 test('an unexpected handler error answers a generic 500', async () => {
