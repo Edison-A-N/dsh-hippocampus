@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.zh.md)
 
-[DSH](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness）的项目记忆 + 后台上下文管理插件——以事件溯源原生的方式，落地 [magic-context](https://github.com/cortexkit/magic-context)（OpenCode 的无限上下文 + 自管理记忆插件）背后的思想。本项目是独立实现，借鉴和改编了哪些内容见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+[DSH](https://github.com/deepseek-ai/deepseek-harness)（DeepSeek Harness）的项目记忆 + 后台上下文管理插件——以事件溯源原生的方式，落地 [magic-context](https://github.com/cortexkit/magic-context)（OpenCode 的无限上下文 + 自管理记忆插件）背后的思想。本项目是独立实现，与 magic-context 项目没有隶属关系，也未经其认可；借鉴和改编了哪些内容见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 海马体在你思考的时候负责记忆：跨会话的项目知识自动沉淀、注入、检索、后台整理；上下文压缩把摘要挪出热路径，step 边界永远不等模型调用。
 

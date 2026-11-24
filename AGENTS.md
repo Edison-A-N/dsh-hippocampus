@@ -63,6 +63,16 @@ npm test        # node:test, no network, no host required (host-contract tests s
 - Env-var knobs follow `HIPPOCAMPUS_<SUBSYSTEM>_<FIELD>`; optional features degrade silently when their env is unset (see the config table in README.md).
 - Commit messages: imperative, one line; prefix with the subsystem when it helps (`compaction:`, `dreamer:`, `docs:`).
 
+## Syncing designs from upstream projects
+
+hippocampus keeps adopting designs from [magic-context](https://github.com/cortexkit/magic-context) (MIT) and DSH packages (MIT). Each sync follows these steps:
+
+1. Check the LICENSE at the exact upstream commit you study. If it is no longer MIT (or another permissive license), stop at the last permissive commit and implement anything newer from your own design only.
+2. Skip upstream files under a different license (for example magic-context's `packages/plugin/src/hooks/magic-context/__fixtures__/`, which holds Apache-2.0 code from Vercel). Using one requires that license's own terms (Apache-2.0: keep its NOTICE and mark changes).
+3. Prefer reimplementing over copying. When text or code is copied or translated line by line, credit the source in a comment at that spot.
+4. Update `THIRD_PARTY_NOTICES.md` in the same change: the "Studied up to" commit, the list of what is adapted, and the copyright line exactly as it reads at that commit.
+5. Never present hippocampus as an official port or as endorsed by the upstream project.
+
 ## Docs policy
 
 - New capability: add a `docs/req/REQ-N` doc (background, requirements, acceptance criteria).

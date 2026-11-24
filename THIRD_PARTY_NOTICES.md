@@ -38,6 +38,9 @@ SOFTWARE.
 ## magic-context
 
 - Source: https://github.com/cortexkit/magic-context
+- Studied up to: commit `642d52816fbdae37ba5359b4e3166fb1a4afe279`
+  (2026-11-20), MIT at that commit. Update this line on every sync.
+- Not affiliated with or endorsed by the magic-context project.
 - Used in: the design of the context-management and curation subsystems
   (`lib/compartments.js`, `lib/historian.js`, `lib/dreamer.js`,
   `lib/baseline.js`): the protected-tail and decay-curve formulas and their

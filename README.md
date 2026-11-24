@@ -2,7 +2,7 @@
 
 [English](README.md) | [中文](README.zh.md)
 
-A project-memory + background context-management plugin for the [DSH](https://github.com/deepseek-ai/deepseek-harness) (DeepSeek Harness) — an event-sourcing-native take on the ideas behind [magic-context](https://github.com/cortexkit/magic-context) (OpenCode's infinite-context + self-managing memory plugin). It is an independent reimplementation; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for what it adapts and from where.
+A project-memory + background context-management plugin for the [DSH](https://github.com/deepseek-ai/deepseek-harness) (DeepSeek Harness) — an event-sourcing-native take on the ideas behind [magic-context](https://github.com/cortexkit/magic-context) (OpenCode's infinite-context + self-managing memory plugin). It is an independent reimplementation, not affiliated with or endorsed by the magic-context project; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for what it adapts and from where.
 
 The hippocampus handles memory while you think: project knowledge survives across sessions — automatically injected, retrieved, and curated in the background — and context compaction summarizes off the hot path so step boundaries never wait on a model call.
 
