@@ -1,0 +1,16 @@
+# dsh-hippocampus bundle patch.
+#
+# hippocampus registers the `compaction` service, and cordis refuses a second
+# provider of a service name, so the stock host-level compaction backend is
+# disabled first. Agent presets that mount their own isolated compaction
+# group keep it; ADR-9 describes how the two coexist.
+- id: compaction-basic
+  disabled: true
+
+# One row activates the host half: the ctx_memory / ctx_note / ctx_search /
+# ctx_expand tools, the baseline injection, background compaction, the
+# optional dreamer, and (Web profile only) the panels' JSON API. The browser
+# half is picked up by the client-modules scan through package.json dsh.client.
+- insert:
+    - id: hippocampus
+      name: 'dsh-hippocampus'

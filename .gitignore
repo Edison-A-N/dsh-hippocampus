@@ -1,0 +1,17 @@
+# build artifacts
+node_modules/
+dist/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editors
+.idea/
+.vscode/
+*.swp
+
+# local env (never commit credentials)
+.env
+.env.*
