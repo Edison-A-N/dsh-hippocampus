@@ -493,3 +493,90 @@ test('a forked (seeded) sub-agent is not pinned: its first surface message is in
   assert.ok(pending.length > 0)
   assert.equal(pending[0].startSeq, session.surface.nodes[1])
 })
+
+// ------------------------------------------------- historian facts (ADR-11)
+
+/** A historian that covers the whole slice and states the given facts. */
+function factHistorian(facts, { half = false } = {}) {
+  const inputs = []
+  return {
+    inputs,
+    stream: async function* (options) {
+      const text = options.messages[0].content[0].text
+      inputs.push(text)
+      const seqs = [...text.matchAll(/^\[(\d+)\]/gm)].map(m => Number(m[1]))
+      const end = half ? seqs[Math.floor(seqs.length / 2)] : seqs.at(-1)
+      yield { type: 'text', text: JSON.stringify({ compartments: [{ start: seqs[0], end, title: 'work', importance: 60, p1: 'p', p2: 'p', p3: 'p', p4: 'k' }], facts }) }
+    },
+  }
+}
+
+test('historian facts become project memories tagged as historian output, deduped against the store', async () => {
+  const { engine, session, store, agent } = makeEngine()
+  store.write({ projectId: 'proj', category: 'NAMING', content: 'The deployment repo is called example-deploy.' })
+  const fake = factHistorian([
+    { category: 'PROJECT_RULES', content: 'Run npm test before every commit.' },
+    { category: 'naming', content: 'The deployment repo is called example-deploy.' }, // restated: a re-observation
+    { category: 'STATUS', content: 'Tests are green.' }, // unknown category: dropped
+    { category: 'ARCHITECTURE', content: '' }, // empty: dropped
+  ])
+  engine.options.stream = fake.stream
+  for (let i = 0; i < 20; i += 1) addTurn(session)
+  await engine.compactIfNeeded(agent, 'pressure')
+  await settle()
+  // the existing memory is shown to the historian for dedup
+  assert.match(fake.inputs[0], /<project-memory>\n- NAMING: The deployment repo is called example-deploy\.\n<\/project-memory>/)
+  const rows = store.list({ projectId: 'proj' })
+  const rule = rows.find(row => row.category === 'PROJECT_RULES')
+  assert.equal(rule.content, 'Run npm test before every commit.')
+  assert.equal(rule.source_type, 'historian')
+  assert.equal(rule.source_session, session.id)
+  assert.equal(rule.importance, 40)
+  assert.equal(rows.length, 2)
+  assert.equal(rows.find(row => row.category === 'NAMING').seen_count, 2)
+  const run = store.db.prepare("SELECT summary_json FROM compaction_runs WHERE mode = 'historian'").get()
+  assert.equal(JSON.parse(run.summary_json).facts, 1)
+})
+
+test('a historian fact never revives an archived memory or promotes a note: it only counts as seen', async () => {
+  const { engine, session, store, agent } = makeEngine()
+  const archived = store.write({ projectId: 'proj', category: 'ARCHITECTURE', content: 'The cache layer is write-through.' })
+  store.archive(archived.id, { reason: 'wrong' })
+  const note = store.write({ projectId: 'proj', category: 'NAMING', content: 'The panel is called Context.', sourceType: 'note' })
+  engine.options.stream = factHistorian([
+    { category: 'ARCHITECTURE', content: 'The cache layer is write-through.' },
+    { category: 'NAMING', content: 'The panel is called Context.' },
+  ]).stream
+  for (let i = 0; i < 20; i += 1) addTurn(session)
+  await engine.compactIfNeeded(agent, 'pressure')
+  await settle()
+  const back = store.get(archived.id)
+  assert.equal(back.status, 'archived')
+  assert.equal(back.seen_count, 2)
+  const stillNote = store.get(note.id)
+  assert.equal(stillNote.source_type, 'note')
+  assert.equal(stillNote.seen_count, 2)
+  assert.equal(store.list({ projectId: 'proj' }).filter(row => row.source_type === 'historian').length, 0)
+})
+
+test('facts from a call that stopped early are not promoted (the rest is read again)', async () => {
+  const { engine, session, store, agent } = makeEngine()
+  engine.options.stream = factHistorian([{ category: 'PROJECT_RULES', content: 'Never push without review.' }], { half: true }).stream
+  for (let i = 0; i < 20; i += 1) addTurn(session)
+  await engine.compactIfNeeded(agent, 'pressure')
+  await settle()
+  assert.equal(store.compartments(session.id, ['pending']).length, 1)
+  assert.equal(store.list({ projectId: 'proj' }).length, 0)
+})
+
+test('HIPPOCAMPUS_HISTORIAN_FACTS=off: no memory block, no promotion', async () => {
+  const { engine, session, store, agent } = makeEngine({ env: { HIPPOCAMPUS_HISTORIAN_FACTS: 'off' } })
+  store.write({ projectId: 'proj', category: 'NAMING', content: 'X is Y.' })
+  const fake = factHistorian([{ category: 'PROJECT_RULES', content: 'Never push without review.' }])
+  engine.options.stream = fake.stream
+  for (let i = 0; i < 20; i += 1) addTurn(session)
+  await engine.compactIfNeeded(agent, 'pressure')
+  await settle()
+  assert.doesNotMatch(fake.inputs[0], /project-memory/)
+  assert.equal(store.list({ projectId: 'proj' }).length, 1)
+})

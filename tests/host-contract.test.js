@@ -304,3 +304,43 @@ test('tool-output reclaim: a real dsh-session Session accepts the events and the
   assert.equal(fold(), total(after)) // shadow prices exact: no drift
   assert.ok(session.surface.nodes.some(seq => isReclaimed(deriveEventMessage(session.eventAt(seq)))))
 })
+
+test('agent and pressure lanes: a real dsh-session Session accepts their placeholders and the meter stays exact', { skip }, async () => {
+  const { applyReclaim, selectPressure, selectRequested, resolveReduceTargets, isReclaimed, originSeq } = await import('../lib/reclaim.js')
+  const { Session, deriveEventMessage, estimateMessage, pressure } = host
+  const session = Session.create('reduce-host')
+  session.append('system/message', { message: { role: 'system', content: [{ type: 'text', text: 'sys' }] } }, { surfaceOp: 'append' })
+  session.append('user/message', { id: 'u0', role: 'user', source: { kind: 'user' }, content: [{ type: 'text', text: 'go' }] }, { surfaceOp: 'append' })
+  for (let i = 0; i < 8; i += 1) {
+    const name = i % 2 === 0 ? 'bash' : 'read'
+    session.append('assistant/message', { turn: 1, step: i, message: { id: `a${i}`, role: 'assistant', source: { kind: 'model' }, content: [{ type: 'tool-call', id: `c${i}`, name, arguments: `{"arg":"v${i}"}` }] }, stream: [], usage: { inputTokens: 1000, outputTokens: 10 } }, { surfaceOp: 'append' })
+    session.append('tool/result', { turn: 1, step: i, message: { id: `t${i}`, role: 'tool', toolCallId: `c${i}`, source: { kind: 'tool', callId: `c${i}` }, content: [{ type: 'text', text: `${'o'.repeat(4000)} ${i}` }] } }, { surfaceOp: 'append' })
+  }
+  const price = () => [...session.surface.nodes].map(seq => {
+    const message = deriveEventMessage(session.eventAt(seq))
+    const tokens = message === null ? 0 : estimateMessage(message)
+    return { seq, tokens, heuristicTokens: tokens }
+  })
+  const fold = () => {
+    let state = pressure.init()
+    for (let seq = 0; seq < session.log.length; seq += 1) state = pressure.apply(state, session.eventAt(seq))
+    return state.surfaceTokens
+  }
+  const total = nodes => nodes.reduce((sum, node) => sum + node.tokens, 0)
+  const before = price()
+  const view = { session, nodes: before.map(n => n.seq), priced: before.map(n => n.tokens), startIdx: 1, usable: 20_000 }
+  // ctx_reduce resolves against the real derived messages
+  const [target] = resolveReduceTargets(session, [{ tool: 'read', match: 'v1' }])
+  assert.equal(target.results.length, 1)
+  const requested = selectRequested({ ...view, requested: [target.results[0].seq] })
+  assert.equal(requested.picked.length, 1)
+  const pressured = selectPressure({ ...view, need: 3_000, skip: new Set(requested.picked.map(p => p.seq)) })
+  assert.ok(pressured.length > 0)
+  const picked = [...requested.picked, ...pressured].sort((a, b) => a.index - b.index)
+  applyReclaim(session, picked, { measurement: { nodes: before } })
+  const after = price()
+  assert.ok(total(after) < total(before))
+  assert.equal(fold(), total(after))
+  const origins = session.surface.nodes.filter(seq => isReclaimed(deriveEventMessage(session.eventAt(seq)))).map(seq => originSeq(session, seq))
+  assert.ok(origins.includes(target.results[0].seq))
+})

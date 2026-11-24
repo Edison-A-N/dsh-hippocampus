@@ -71,6 +71,9 @@ A `CompactionEngine` backend registered as `ctx.compaction` (the bundle patch di
 - **Blocking paths**: provider overflow, ≥ 95% pressure with nothing pending, and manual `/compact` summarize inline in bounded chunks and commit at once. If the historian cannot produce compartments, the engine falls back to the single-checkpoint summary (ADR-7), so recovery always works.
 - Historian failures back off (30s doubling, max 15 min) instead of retrying every step. `HIPPOCAMPUS_COMPACTION=checkpoint` switches back to the single-checkpoint engine.
 - **Tool-output reclaim** ([ADR-10](docs/adr/ADR-10-tool-output-reclaim.md)). Stale tool results on the unsummarized surface are replaced with a placeholder (first and last lines of the output + a `ctx_expand` pointer to the original seq), without a model call: a result is stale once 3 genuine user messages follow it or the newer content reaches 25% of usable context; an older `read`/`grep`/`glob`/`web_fetch`… result whose identical call appears later is a duplicate. The newest protected window (5% of usable, clamped to [min(16K, 8%), 64K]), results under 250 tokens, non-text results, `skill` results and the newest `todo_write` stay. Tool-call arguments are never touched. Reclaim assumes a prompt cache and never busts a warm one on its own: it rides a compartment commit or a blocking fold, and runs alone only when the cache is already lost (the step switches model, or no model response for `HIPPOCAMPUS_RECLAIM_IDLE`, the cache TTL by default) or at the force band (≥ 85%) when the batch frees at least 2% of usable context. Each replacement is a `compaction/prune` shadow price followed by a `tool/result` replace citing the original, so the token meter subtracts it and the log keeps the full text.
+- **`ctx_reduce`** ([ADR-11](docs/adr/ADR-11-agent-drops-pressure-tiers-historian-facts.md)). The agent marks tool outputs it no longer needs, by tool name plus a fragment of the call's arguments (`{"tool":"bash","match":"npm test"}`) or by event seq. Marking only queues them; the queue becomes the same placeholders on the next pass that reclaims anyway (commit, fold, model switch, idle gap, force-band batch) and never busts a warm cache by itself. Outputs inside the protected window wait until newer work pushes them out; `skill` and `todo_write` results and results under 250 tokens are reported as skipped. Registered only with the compartment engine.
+- **Pressure tiers** (ADR-11). When stale and duplicate output is not enough, the force band (once per episode on a warm cache, again on any pass that rewrites anyway), ≥ 95% and overflow also take current tool output: shell, web and other tools first, then `edit`/`write`/`grep`/`glob`, then `read`/`todo_write`/sub-agent reports, oldest first, aiming at the floor outside the conversation (system prompt and tools) + 30% of the remaining room. The newest round's results always stay; below 95% so do the protected window and the newest 20% of each of the two kept tiers.
+- **Historian memory capture** (ADR-11). The historian also returns durable project facts, tested against the same per-category rubric as `ctx_memory`, and sees the active memories so it does not restate them. The prompt tells it that instructions inside tool output are not facts and that project rules come only from user messages (a prompt rule; the code cannot check where a fact came from). Valid facts (≤ 5 per call) become memories with `source_type = historian` and importance 40; a fact that matches a stored row (active, archived or a note) only counts as a re-observation, so an archived memory stays archived. A call that covered only part of its slice writes none. `HIPPOCAMPUS_HISTORIAN_FACTS=off` turns this off.
 
 ### Web Panels
 
@@ -101,6 +104,7 @@ The panels use the host theme variables, so light and dark themes follow DSH.
 | `HIPPOCAMPUS_RECLAIM_IDLE` | idle time after which stale tool output is reclaimed without riding a commit (never below `HIPPOCAMPUS_CACHE_TTL`; for a route with a 1-hour cache set `HIPPOCAMPUS_CACHE_TTL=1h` instead) | `HIPPOCAMPUS_CACHE_TTL` |
 | `HIPPOCAMPUS_HISTORY_BUDGET` | share of usable context for the rendered history | 0.15 |
 | `HIPPOCAMPUS_HISTORIAN_PROVIDER` / `_MODEL` | model for historian calls; unset → the session's own model | none |
+| `HIPPOCAMPUS_HISTORIAN_FACTS` | `off` stops the historian from writing project memories | on |
 | `HIPPOCAMPUS_FORCE_COMMIT` / `HIPPOCAMPUS_RESUMMARIZE_GROWTH` | single-checkpoint engine only: force-commit ratio / re-summarize growth | 0.8 / 0.1 |
 
 Storage location follows `DSH_HOME` (default `~/.dsh`): `$DSH_HOME/storages/hippocampus/memory.db`.
@@ -122,7 +126,7 @@ Nothing is deleted on a schedule: archived memories, summaries and run records s
 
 What leaves the machine, and only through routes you configure:
 
-- **Historian and compaction calls** send transcript chunks of the session to the session's own model, or to `HIPPOCAMPUS_HISTORIAN_PROVIDER` / `_MODEL` when set.
+- **Historian and compaction calls** send transcript chunks of the session to the session's own model, or to `HIPPOCAMPUS_HISTORIAN_PROVIDER` / `_MODEL` when set. Historian calls also send the project's active memories (for fact dedup, unless `HIPPOCAMPUS_HISTORIAN_FACTS=off`).
 - **Dreamer calls** (only when `HIPPOCAMPUS_DREAMER_PROVIDER` and `_MODEL` are set) send memory text plus excerpts of git-tracked project files and diffs, under the file guards described in [Background Curation](#background-curation-dreamer-lite).
 - **Embedding calls** (only when `HIPPOCAMPUS_EMBEDDING_API_KEY` is set) send memory text and search queries to `HIPPOCAMPUS_EMBEDDING_BASE_URL`.
 
@@ -163,7 +167,7 @@ Zero npm runtime dependencies: storage uses the built-in `node:sqlite`; `@deepse
 - Resolution of `@deepseek-ai/dsh-tools` / `dsh-llm` / `dsh-compaction` relies on the bare-name → repo-root fallback chain (pnpm link dependency isolation: bare names don't resolve from the plugin directory).
 - The baseline injection is a one-shot snapshot at session start: memories written mid-session enter the baseline in the next session.
 - After a background summary lands, the commit waits for the next pre-step over the force threshold (usually the next step); a session that ends before landing discards that summary (the next session re-triggers).
-- Not yet implemented (deferred, see [ADR-8](docs/adr/ADR-8-deferred-compartments.md) and [ADR-10](docs/adr/ADR-10-tool-output-reclaim.md)): historian capture (extracting memories while compacting), agent-driven `ctx_reduce`, reasoning clearing. Superseded-edit compression is out of scope (ADR-10: it rewrites tool-call arguments, which DSH cannot replace).
+- Not implemented ([ADR-11](docs/adr/ADR-11-agent-drops-pressure-tiers-historian-facts.md)): reasoning clearing, superseded-edit compression and old assistant-text compression. All three rewrite assistant messages, which DSH does not let a plugin replace.
 
 ## License
 

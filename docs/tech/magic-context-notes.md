@@ -50,4 +50,4 @@ magic-context needs eight host capabilities, the critical ones being: a per-call
 
 ## What was consciously deferred
 
-Compartments + decay rendering, historian capture, ctx_expand/ctx_note — see [ADR-8](../adr/ADR-8-deferred-compartments.md).
+Compartments + decay rendering, historian capture, ctx_expand/ctx_note — see [ADR-8](../adr/ADR-8-deferred-compartments.md). All of these have since landed (ADR-9, ADR-10, ADR-11). Still not done: reasoning clearing, superseded-edit compression and old assistant-text compression, which need an assistant-message rewrite: DSH cannot replace one, and the message-projection route was rejected (ADR-11).

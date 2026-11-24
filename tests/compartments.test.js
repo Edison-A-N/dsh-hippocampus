@@ -16,6 +16,8 @@ import {
   providerPrice,
   toolsHeuristicTokens,
   inputCapacity,
+  parseHistorianFacts,
+  HISTORIAN_MEMORY_CHARS,
 } from '../lib/compartments.js'
 
 const compartment = (startSeq, endSeq, importance = 50, size = 1) => ({
@@ -184,4 +186,27 @@ test('parseHistorianOutput honours the declared end of the last compartment', ()
   assert.deepEqual(out.map(c => [c.startSeq, c.endSeq]), [[1, 3]])
   const missing = parseHistorianOutput('{"compartments":[{"start":1,"p1":"a"}]}', [1, 2, 3])
   assert.equal(missing[0].endSeq, 3)
+})
+
+test('parseHistorianFacts keeps valid facts only, capped per call; malformed replies yield none', () => {
+  const categories = ['PROJECT_RULES', 'NAMING']
+  const reply = facts => JSON.stringify({ compartments: [], facts })
+  assert.deepEqual(parseHistorianFacts(reply([{ category: 'naming', content: '  a   b ' }]), categories), [{ category: 'NAMING', content: 'a b' }])
+  assert.deepEqual(parseHistorianFacts(reply([{ category: 'NAMING', content: 'x'.repeat(401) }]), categories), [])
+  assert.deepEqual(parseHistorianFacts(reply([{ category: 'NAMING', content: 'Same' }, { category: 'NAMING', content: 'same' }]), categories).length, 1)
+  assert.equal(parseHistorianFacts(reply(Array.from({ length: 9 }, (_, i) => ({ category: 'NAMING', content: `fact ${i}` }))), categories).length, 5)
+  assert.deepEqual(parseHistorianFacts('no json', categories), [])
+  assert.deepEqual(parseHistorianFacts('{"compartments":[]}', categories), [])
+  assert.deepEqual(parseHistorianFacts('{"facts":"nope"}', categories), [])
+})
+
+test('historianUserMessage shows project memory as whole lines within its budget', () => {
+  const memories = Array.from({ length: 200 }, (_, i) => ({ category: 'NAMING', content: `memory number ${i} ${'x'.repeat(60)}` }))
+  const text = historianUserMessage('[1] U: hi', [], memories)
+  const block = text.slice(text.indexOf('<project-memory>'), text.indexOf('</project-memory>'))
+  assert.ok(block.length <= HISTORIAN_MEMORY_CHARS + 20)
+  assert.match(block, /memory number 0 /)
+  assert.doesNotMatch(block, /memory number 199 /)
+  assert.ok(block.trimEnd().split('\n').slice(1).every(line => line.endsWith('x')))
+  assert.doesNotMatch(historianUserMessage('[1] U: hi'), /project-memory/)
 })

@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted (2026-11-11). Extends ADR-9.
+Accepted (2026-11-11). Extends ADR-9. Extended by ADR-11 (agent drops, pressure tiers).
 
 ## Context
 
@@ -48,7 +48,7 @@ Add `lib/reclaim.js` (pure selection + event writing) and call it from `Compartm
 - **Reclaim every step on routes that report no cache use.** Optimizes one route's quirk; on any cached route it would bust the prefix on most steps.
 - **Use the stock tool-result-pruner.** Unreachable from this scope, size-based rather than age-based, and runs only at 80%.
 - **Head/tail truncation to 5K instead of a placeholder.** Keeps 5K characters of every large result forever; age, not size, is what makes output useless.
-- **Agent-driven `ctx_reduce`.** Needs a tool, nudges and a drop queue; deferred until automatic reclaim has been observed in use.
+- **Agent-driven `ctx_reduce`.** Needs a tool, nudges and a drop queue; deferred until automatic reclaim has been observed in use. Added by ADR-11 (tool and queue, without nudges).
 
 ## Consequences
 
@@ -58,4 +58,4 @@ Add `lib/reclaim.js` (pure selection + event writing) and call it from `Compartm
 - Lineage (ADR-9) is unaffected: the checkpoint seq and pending boundaries are never replaced; a replaced interior node of a pending span keeps the span contiguous.
 - `ctx_expand` returns the original in full; there is no size cap on what it brings back.
 - Not configurable today: 3 user turns, 25% distance, 250-token floor, 2% force floor, the placeholder head/tail sizes, the protected-tool list, the read-only tool list.
-- Still deferred: reasoning clearing, emergency tiering by tool kind, `ctx_reduce`.
+- Deferred here, settled in ADR-11: emergency tiering by tool kind and `ctx_reduce` are added; reasoning clearing is not done.

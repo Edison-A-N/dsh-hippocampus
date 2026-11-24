@@ -47,8 +47,14 @@ SOFTWARE.
   constants, the memory selection order, the per-category admission rubric
   in the `ctx_memory` tool description, the structure of the historian
   prompt (work units, four summary tiers, `U:` quotes; `lib/compartments.js`),
-  and the dreamer's verify/curate task prompts and safety gates
-  (`lib/dreamer.js`). The prompts are rewritten rather than copied.
+  the dreamer's verify/curate task prompts and safety gates
+  (`lib/dreamer.js`), and the tool-output reclaim lanes (`lib/reclaim.js`):
+  age and dedup reclaim, the `ctx_reduce` queue-and-apply rule and the
+  guidance in its tool description, the emergency tool tiers with their
+  target fraction, recency reserve, minimum batch and per-episode latch, and
+  historian fact capture (the `facts` output and `<project-memory>` dedup
+  block in the historian prompt). The prompts and the tool description are
+  rewritten rather than copied.
   hippocampus is an independent JavaScript implementation for DSH; no
   source files are copied.
   `docs/tech/magic-context-notes.md` records what was studied.

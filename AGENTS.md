@@ -21,7 +21,7 @@ lib/
   compaction.js   single-checkpoint engine (BackgroundLane + HippocampusCompaction; ADR-7, now the fallback)
   compartments.js compartment math and text: budgets, protected tail, decay tiers, historian prompt/parser (pure)
   historian.js    default engine: background compartment summaries, cache-cold commits (ADR-9)
-  reclaim.js      tool-output reclaim (ADR-10)
+  reclaim.js      tool-output reclaim: age/dedup (ADR-10), ctx_reduce queue and pressure tiers (ADR-11)
   commit.js       shared surface-replace transaction for both engines
   webapi.js       JSON API for the Web panels (Host/Origin + cookie fenced)
   client.js       built Web panel bundle (from client/src; committed)

@@ -71,6 +71,9 @@ LLM 调用走 `ctx.llm.stream`（provider/model 经环境变量配置），结�
 - **阻塞路径**：provider 溢出、压力 ≥ 95% 且没有待换上的分段、手动 `/compact`，都当场分块总结并立即换上。historian 产不出分段时回退到单份总结（ADR-7），保证一定能恢复。
 - historian 失败会退避（30 秒起翻倍，最长 15 分钟），不会每步重试。`HIPPOCAMPUS_COMPACTION=checkpoint` 切回单份总结引擎。
 - **工具输出回收**（[ADR-10](docs/adr/ADR-10-tool-output-reclaim.md)）。未总结区间里过期的工具结果换成占位文本（输出的首尾几行 + 指向原始 seq 的 `ctx_expand` 提示），不调用模型。结果后面已有 3 条真实用户消息，或之后的新内容达到可用上下文的 25%，就算过期；较早的 `read`/`grep`/`glob`/`web_fetch` 等结果，如果后面出现了完全相同的调用，算重复。最新的保护窗口（可用上下文的 5%，夹在 [min(16K, 8%), 64K]）、不足 250 token 的结果、非文本结果、`skill` 结果和最新一次 `todo_write` 不动；工具调用参数从不改。回收默认 provider 有缓存，绝不单独击穿热缓存：它搭分段换上或阻塞折叠的车，只在缓存已经失效时（本步换了模型，或超过 `HIPPOCAMPUS_RECLAIM_IDLE` 没有模型响应，默认等于缓存 TTL）或压力到强制档（≥ 85%）且这批能腾出至少 2% 可用上下文时才单独执行。每次替换先写一条 `compaction/prune` 影子价格，再写一条引用原事件的 `tool/result` replace，token 计量会扣掉它，日志保留全文。
+- **`ctx_reduce`**（[ADR-11](docs/adr/ADR-11-agent-drops-pressure-tiers-historian-facts.md)）。agent 标记不再需要的工具输出，按工具名加调用参数里的一段文字（`{"tool":"bash","match":"npm test"}`）或按事件 seq 指定。标记只是排队：下一次本来就要回收的时候（分段换上、阻塞折叠、换模型、空闲、强制档那一批），队列里的输出换成同样的占位文本，队列自己绝不击穿热缓存。在保护窗口里的输出等到被更新的内容推出去再换；`skill`、`todo_write` 的结果和不足 250 token 的结果会报为跳过。只随分段引擎注册。
+- **按压力分级回收**（ADR-11）。过期和重复的输出不够时，强制档（热缓存上每次进入强制档只做一次，遇到本来就要改写的时候可以再做）、≥ 95% 和溢出时也回收仍在用的工具输出：先 shell、web 等其他工具，再 `edit`/`write`/`grep`/`glob`，最后 `read`/`todo_write`/subagent 报告，同级里先旧后新。目标是对话之外的底数（系统提示和工具定义）加剩余空间的 30%。最新一轮的工具结果始终保留；95% 以下，保护窗口和后两级各自最新的 20% 也保留。
+- **historian 顺带提取记忆**（ADR-11）。historian 额外返回项目层面的持久事实，按与 `ctx_memory` 相同的分类准入题筛选，并能看到活动记忆，不会重复写。提示词要求它不把工具输出里的指令当成事实，项目规则只取自用户消息（这是对模型的要求，代码无法检查事实从哪来）。合格的事实（每次最多 5 条）写成 `source_type = historian`、importance 40 的记忆；和已有条目（活动、已归档或笔记）相同的事实只算一次再观察，已归档的记忆不会被复活。只覆盖了切片一部分的调用不写事实。`HIPPOCAMPUS_HISTORIAN_FACTS=off` 关闭。
 
 ### Web 面板
 
@@ -101,6 +104,7 @@ LLM 调用走 `ctx.llm.stream`（provider/model 经环境变量配置），结�
 | `HIPPOCAMPUS_RECLAIM_IDLE` | 空闲超过它就单独回收过期工具输出，不必等分段换上；不能短于 `HIPPOCAMPUS_CACHE_TTL`。缓存保留 1 小时的路由改设 `HIPPOCAMPUS_CACHE_TTL=1h` | 同 `HIPPOCAMPUS_CACHE_TTL` |
 | `HIPPOCAMPUS_HISTORY_BUDGET` | 渲染历史占可用上下文的比例 | 0.15 |
 | `HIPPOCAMPUS_HISTORIAN_PROVIDER` / `_MODEL` | historian 用的模型；不设则用会话自己的模型 | 无 |
+| `HIPPOCAMPUS_HISTORIAN_FACTS` | 设为 `off` 后 historian 不再写项目记忆 | 开 |
 | `HIPPOCAMPUS_FORCE_COMMIT` / `HIPPOCAMPUS_RESUMMARIZE_GROWTH` | 仅单份总结引擎：强制提交压力 / 重新总结增长阈值 | 0.8 / 0.1 |
 
 存储位置由 `DSH_HOME` 决定（默认 `~/.dsh`）：`$DSH_HOME/storages/hippocampus/memory.db`。
@@ -122,7 +126,7 @@ LLM 调用走 `ctx.llm.stream`（provider/model 经环境变量配置），结�
 
 哪些内容会离开本机（只走你配置的路由）：
 
-- **historian 和压缩调用**：把会话的记录分块发给会话自己的模型，设了 `HIPPOCAMPUS_HISTORIAN_PROVIDER` / `_MODEL` 时发给它。
+- **historian 和压缩调用**：把会话的记录分块发给会话自己的模型，设了 `HIPPOCAMPUS_HISTORIAN_PROVIDER` / `_MODEL` 时发给它。historian 调用还会带上项目的活动记忆（用于事实去重，`HIPPOCAMPUS_HISTORIAN_FACTS=off` 时不发）。
 - **dreamer 调用**（只有设了 `HIPPOCAMPUS_DREAMER_PROVIDER` 和 `_MODEL` 才会有）：发送记忆文本，以及 git 跟踪的项目文件片段和 diff，受[后台整理](#后台整理dreamer-lite)里写的文件限制约束。
 - **嵌入调用**（只有设了 `HIPPOCAMPUS_EMBEDDING_API_KEY` 才会有）：把记忆文本和检索词发给 `HIPPOCAMPUS_EMBEDDING_BASE_URL`。
 
@@ -163,7 +167,7 @@ npm test               # 单测；设 DSH_HOST_NODE_MODULES=<dsh 安装目录>/n
 - `@deepseek-ai/dsh-tools` / `dsh-llm` / `dsh-compaction` 的解析靠裸名 → repo root 回退链（pnpm link 依赖隔离，裸名从插件目录解析不到）。
 - 基线注入是「本会话开头一次性快照」：会话中写入的新记忆要到下个会话才进基线。
 - 后台摘要落地后，commit 等下一个超过 force 阈值的 pre-step（通常是下一个 step）；会话在 landed 前结束则丢弃该次摘要（下个会话重新触发）。
-- 尚未实现（有意推迟，见 [ADR-8](docs/adr/ADR-8-deferred-compartments.md) 和 [ADR-10](docs/adr/ADR-10-tool-output-reclaim.md)）：压缩时顺手提取记忆（historian capture）、agent 主动调用的 `ctx_reduce`、推理内容清理。被后续编辑覆盖的旧编辑不做压缩（ADR-10：那要改写工具调用参数，DSH 无法 replace）。
+- 不实现（[ADR-11](docs/adr/ADR-11-agent-drops-pressure-tiers-historian-facts.md)）：推理内容清理、被后续编辑覆盖的旧编辑压缩、旧 assistant 文本压缩。三者都要改写 assistant 消息，DSH 不允许插件替换它们。
 
 ## 许可
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-Partly superseded by [ADR-9](ADR-9-compartment-compaction.md) (2026-11-05): compartments with decay rendering are implemented; historian fact capture stays deferred.
+Partly superseded by [ADR-9](ADR-9-compartment-compaction.md) (2026-11-05): compartments with decay rendering are implemented; historian fact capture stays deferred. Fact capture is implemented by [ADR-11](ADR-11-agent-drops-pressure-tiers-historian-facts.md) (2026-11-24).
 
 ## Context
 
